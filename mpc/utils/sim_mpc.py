@@ -155,8 +155,8 @@ class Mpc:
         ))
 
         if self.use_lqr:
-            self.u_constr = np.ones((self.nu_obs,1)) * np.infty
-            self.l_constr = np.ones((self.nu_obs,1)) * -np.infty
+            self.u_constr = np.ones((self.nu_obs,1)) * np.inf
+            self.l_constr = np.ones((self.nu_obs,1)) * -np.inf
 
         #Variables for FGM
         self.z_new = np.zeros((self.nu_obs, 1), dtype=dtype)   
@@ -349,9 +349,29 @@ class Mpc:
 
     #Solves the MPC problem using nn
     def solvenn(self,k):
-        x_aug = np.transpose(np.vstack((self.x_obs_new[:,0:1], self.xd_obs_new)))
-        x_aug = torch.tensor(x_aug).float().to(self.device)
-        self.u_nn = self.nn_controller(x_aug).detach().numpy()
+        # Build augmented input to match training data layout:
+        # [x0_obs; xd_obs; q_vec; lower_control_constraints; upper_control_constraints]
+        # x_obs_new[:,0:1] and xd_obs_new are column vectors
+        x_state = np.vstack((self.x_obs_new[:,0:1], self.xd_obs_new))  # shape (n_state, 1)
+
+        # q_vec needs to be the dynamic q(x) term: q = q_mat @ x_aug
+        # x_aug for q calculation is typically [x0; xd]
+        q_vec = self.q_mat @ x_state
+
+        # Extract control-only lower/upper constraints (first nu rows correspond to control limits)
+        try:
+            l_ctrl = np.asarray(self.l_constr[:self.nu_obs]).reshape(self.nu_obs, 1)
+            u_ctrl = np.asarray(self.u_constr[:self.nu_obs]).reshape(self.nu_obs, 1)
+        except Exception:
+            # Fallback: if shapes are unexpected, zero-pad to control size
+            l_ctrl = np.zeros((self.nu_obs, 1))
+            u_ctrl = np.zeros((self.nu_obs, 1))
+
+        # Stack all pieces
+        x_aug_np = np.vstack((x_state, q_vec, l_ctrl, u_ctrl))
+        x_aug = torch.tensor(x_aug_np.T).float().to(self.device)
+        # Run NN controller
+        self.u_nn = self.nn_controller(x_aug).detach().cpu().numpy()
         self.u_nn = np.transpose(self.u_nn)
         t = self.u_nn
         self.u_nn = np.maximum(self.l_constr, np.minimum(self.u_constr, self.u_nn))

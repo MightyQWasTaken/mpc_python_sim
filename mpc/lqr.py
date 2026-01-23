@@ -4,10 +4,11 @@ from utils import processdata as process
 from utils import model as md
 import torch
 from utils import sim_mpc as sim
+import os
 
 # Script to generate LQR data for the 4-state system
 
-fname = '../data/systems/4statesystemnd8.mat'
+fname = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'systems', '4statesystemnd8.mat')
 #OnlyValidforND8
 mat_data = loadmat(fname)
 direction = 'vertical'
@@ -20,7 +21,7 @@ else:
     kd = mat_data['Kcd_x']
 
 k = np.hstack((kx, kd))
-n_samples = 100
+n_samples = 15000
 
 def generate_basis(dim):
     return np.eye(dim)
@@ -49,7 +50,7 @@ x0_obs = x[0:4, :].T
 xd_obs = x[4:, :].T  
 u_sim = u_sim.T
 
-data_dir = '../data'
+data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
 process.process_data_shuff(x0_obs, xd_obs, u_sim, data_dir, use_dagger=False)
 

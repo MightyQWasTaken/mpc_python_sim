@@ -37,7 +37,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # options
-fname_RM = '../orms/GoldenBPMResp_DIAD.mat'
+fname_RM = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'orms', 'GoldenBPMResp_DIAD.mat')
 pick_dir = 1
 dirs = ['horizontal','vertical']
 pick_direction = dirs[pick_dir]
@@ -48,7 +48,7 @@ use_FGM = True
 use_lqr = True
 
 #Hardlimits
-fname_correctors = '../data/corrector_data.csv'
+fname_correctors = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'corrector_data.csv')
 correctors = pd.read_csv(fname_correctors)
 hardlimits = correctors['MaxAmps'].iloc[:172]
 hardlimits = hardlimits.to_numpy().reshape(172, 1)
@@ -83,7 +83,7 @@ RMy = RMorigy[np.ix_(id_to_bpm_y, id_to_cm_y)]
 
 
 
-fname = '../data/systems/4statesystemnd8.mat'
+fname = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'systems', '4statesystemnd8.mat')
 #OnlyValidforND8
 mat_data = loadmat(fname)
 
@@ -177,10 +177,10 @@ if use_FGM:
 
 #Rate limiter on VME processors
 if pick_direction == 'vertical':
-    mat_data.update(loadmat('../data/awrSSy.mat'))
+    mat_data.update(loadmat(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'awrSSy.mat')))
 
 else:
-    mat_data.update(loadmat('../data/awrSSx.mat'))
+    mat_data.update(loadmat(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'awrSSx.mat')))
 
 
 n_samples = 15000
@@ -256,48 +256,48 @@ def evaluateModel(model, udata, xdata):
     return torch.mean(torch.tensor(losses, device=device))
 
 # Arbitary testing of various models 
-root = "/Users/alexjackson/Desktop/EUROP/Models/4States/lqr/RandSampleLin"
+root = "/home/adam/mpc_python_sim"
 
 model = md.LinearController(8,4)
-model.load_state_dict(torch.load(os.path.join(root, "250/model.ckpt")))
+model.load_state_dict(torch.load(os.path.join(root, "data/model/model.ckpt")))
 
-loss250 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
-
-
-model.load_state_dict(torch.load(os.path.join(root, "500/model.ckpt")))
-
-loss500 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+loss = evaluateModel(model, udata, xdata).cpu().detach().numpy()
 
 
-model.load_state_dict(torch.load(os.path.join(root, "1000/model.ckpt")))
+# model.load_state_dict(torch.load(os.path.join(root, "500/model.ckpt")))
 
-loss1000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
-
-
-model.load_state_dict(torch.load(os.path.join(root, "2000/model.ckpt")))
-
-loss2000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+# loss500 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
 
 
-model.load_state_dict(torch.load(os.path.join(root, "10000/model.ckpt")))
+# model.load_state_dict(torch.load(os.path.join(root, "1000/model.ckpt")))
 
-loss10000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
-
-
-model.load_state_dict(torch.load(os.path.join(root, "100000/model.ckpt")))
-
-loss100000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+# loss1000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
 
 
-model.load_state_dict(torch.load(os.path.join(root, "1000000/model.ckpt")))
+# model.load_state_dict(torch.load(os.path.join(root, "2000/model.ckpt")))
 
-loss1000000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+# loss2000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
 
 
-samples = [250, 500, 1000, 2000]
+# model.load_state_dict(torch.load(os.path.join(root, "10000/model.ckpt")))
+
+# loss10000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+
+
+# model.load_state_dict(torch.load(os.path.join(root, "100000/model.ckpt")))
+
+# loss100000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+
+
+# model.load_state_dict(torch.load(os.path.join(root, "1000000/model.ckpt")))
+
+# loss1000000 = evaluateModel(model, udata, xdata).cpu().detach().numpy()
+
+
+samples = [100]
 logsamples = np.log(samples)
-lossdata = [loss250, loss500, loss1000, loss2000, loss10000]
-labels = ["250 Samples", "500 Samples", "1000 Samples", "2000 Samples", "10000 Samples"]
+lossdata = [loss]
+labels = ["100 Samples"]
 
 plt.bar(labels, lossdata)
 plt.ylabel("Mean L2 Loss Across Dataset")
