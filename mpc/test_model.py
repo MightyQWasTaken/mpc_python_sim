@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 import numpy as np
 import numpy.random as npr
-
+ 
 import os
 
 import matplotlib
@@ -47,7 +47,7 @@ def randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag):
 
 
 # Helper function to generate random sinusoidal disturbance modes
-def randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag, freq=4, amp_ratio=1):
+def randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag, freq=1, amp_ratio=1):
     base_doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)  # shape (TOT_BPM, n_samples)
 
     # Time vector and sinusoid (uses globals n_samples and Ts)
@@ -78,7 +78,7 @@ pick_direction = dirs[pick_dir]      # 'horizontal' or 'vertical'
 sim_IMC = False
 use_FGM = False
 #Simulates multiple modes of disturbance to get training data
-generate_data = True
+generate_data = False
 #Toggle for comparing nn performance and mpc performance
 compare = True
 #Toggle for using DAGGER
@@ -288,7 +288,7 @@ if generate_data:
     
     
     #Initialise array of seeds for pertubations
-    n_traj = 1000
+    n_traj = 50 
     trainseeds = np.linspace(1, n_traj*n_include, n_traj*n_include).astype(int)
     u_mags = np.linspace(1, 100, n_traj*n_include)
     n_tests = n_traj * n_include
@@ -318,9 +318,9 @@ if generate_data:
     for seed, u_mag in zip(trainseeds, u_mags):
         print('[{}/{}]'.format(n_complete, n_tests))
         #Generate random disturbance modes based on seed
-        doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+        # doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)
         # Use deterministic sinusoidal disturbance instead
-        # doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+        doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag)
 
 
 
@@ -393,7 +393,7 @@ if generate_data:
             y_sim_fgm ,u_sim_fgm, x0_obs_fgm, xd_obs_fgm, _ , n_simulated = mpc.sim_mpc(use_FGM)
             #Check that mpc has converged
             try:
-                assert(n_simulated < n_samples)
+                # assert(n_simulated < n_samples) # Steady state check is not valid for dynamic (sinusoidal) disturbances
                 u_sim_train[k:k+n_simulated, :] = u_sim_fgm[:,id_to_cm]
                 xd_obs_train[k:k+n_simulated, :] = xd_obs_fgm
                 x0_obs_train[k:k+n_simulated, :] = x0_obs_fgm
@@ -505,9 +505,9 @@ if generate_data:
 
 else:   # If not training simulate once for comparison or evaluation
     # Generate constant non-zero disturbance for evaluation
-    doff = randModes(4200, RM, id_to_bpm, TOT_BPM, 100)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
+    # doff = randModes(4200, RM, id_to_bpm, TOT_BPM, 100)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
     # Use deterministic sinusoidal disturbance instead
-    # doff = randModesSinusoid(4200, RM, id_to_bpm, TOT_BPM, 100)
+    doff = randModesSinusoid(4200, RM, id_to_bpm, TOT_BPM, 100)
 
 
     #Simulation

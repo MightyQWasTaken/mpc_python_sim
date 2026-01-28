@@ -5,3 +5,4 @@
 wandb/
 wandb/
 data/*.npy
+data/*.pt

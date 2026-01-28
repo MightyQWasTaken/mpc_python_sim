@@ -70,8 +70,6 @@ class get_loss(nn.Module):
         Returns: scalar loss
         """
         # 1. Supervised Tracking Loss (L1)
-        # ~~~~~~~~~~ Check this - figure 22 are currently too different ~~~~~~~~~~~~~~~~~~
-        # loss_tracking = torch.mean(torch.abs(predictions - targets))
         loss_tracking = torch.norm(predictions - targets)
 
         # 2. Quadratic/Linear MPC surrogate (L2) : 0.5 * u^T J u + q^T u

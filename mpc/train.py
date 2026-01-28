@@ -58,7 +58,7 @@ num_epochs = 500
 weight_decay = 0
 batch_size = 64
 num_layers = 1
-wandb_run_name = "NN input appended with linear cost and constraints. Constant disturbance (not sinusoid/ freq sweep). old loss function."
+wandb_run_name = "NN input appended with linear cost and constraints. Frequency sweep. Frequency is 1/4 that of blue line in fig 22. New loss function; only L1 for now. Should be similar to blue in Figure 22"
 
 
 # region | data prep
@@ -280,25 +280,29 @@ elif model_type == 'lqr':
     np.save(os.path.join(model_dir, 'K_matrix.npy'), K_matrix)
 
 elif model_type == 'nn':
-    # Save full NN weights
-    torch.save(model.state_dict(), os.path.join(model_dir, 'model.ckpt'))
+    # Save full NN weights separately
+    torch.save(model.state_dict(), os.path.join(model_dir, 'model_nn.ckpt'))
 
-    # # (Optional) Create a linear least-squares approximation u = W x + b on the training
-    # # data for legacy loaders. Saved as model_linear_approx.ckpt
-    # try:
-    #     X = x_train_data.cpu().numpy().reshape(-1, n_state)
-    #     U = u_train_data.cpu().numpy().reshape(-1, n_ctrl)
-    #     X_aug = np.hstack([X, np.ones((X.shape[0], 1), dtype=X.dtype)])
-    #     Beta, *_ = np.linalg.lstsq(X_aug, U, rcond=None)
-    #     W = Beta[:-1, :].T.astype(np.float32)  # (n_ctrl, n_state)
-    #     b = Beta[-1, :].astype(np.float32)     # (n_ctrl,)
-    #     linear_state = {
-    #         'fc.weight': torch.from_numpy(W),
-    #         'fc.bias': torch.from_numpy(b),
-    #     }
-    #     torch.save(linear_state, os.path.join(model_dir, 'model_linear_approx.ckpt'))
-    # except Exception as e:
-    #     print('Warning: failed to compute linear fit for compatibility:', e)
+    # Create a linear least-squares approximation u = W x + b on the training
+    # data so legacy loaders that instantiate a LinearController can still
+    # load a compatible checkpoint. This produces keys `fc.weight` and
+    # `fc.bias` saved into model.ckpt.
+    try:
+        X = x_train_data.cpu().numpy().reshape(-1, n_state)
+        U = u_train_data.cpu().numpy().reshape(-1, n_ctrl)
+        X_aug = np.hstack([X, np.ones((X.shape[0], 1), dtype=X.dtype)])
+        Beta, *_ = np.linalg.lstsq(X_aug, U, rcond=None)
+        W = Beta[:-1, :].T.astype(np.float32)  # (n_ctrl, n_state)
+        b = Beta[-1, :].astype(np.float32)     # (n_ctrl,)
+        linear_state = {
+            'fc.weight': torch.from_numpy(W),
+            'fc.bias': torch.from_numpy(b),
+        }
+        torch.save(linear_state, os.path.join(model_dir, 'model.ckpt'))
+    except Exception as e:
+        print('Warning: failed to compute linear fit for compatibility:', e)
+        # Fallback: save the NN weights as model.ckpt (may not be compatible)
+        torch.save(model.state_dict(), os.path.join(model_dir, 'model.ckpt'))
 
 else:
     # Unknown model type: save the raw state_dict
