@@ -78,7 +78,7 @@ pick_direction = dirs[pick_dir]      # 'horizontal' or 'vertical'
 sim_IMC = False
 use_FGM = False
 #Simulates multiple modes of disturbance to get training data
-generate_data = False
+generate_data = True
 #Toggle for comparing nn performance and mpc performance
 compare = True
 #Toggle for using DAGGER
@@ -352,10 +352,7 @@ if generate_data:
             SOFB_setp, beta_fgm, use_lqr=use_lqr)
 
         if use_dagger:
-            if 'fc.weight' in nnparams.keys():
-                model = md.LinearController(n_state, n_ctrl)
-            else:
-                model = md.NNController(n_state, hidden_size, n_ctrl)
+            model = md.NNController(n_state, hidden_size, n_ctrl)
             model.load_state_dict(nnparams)
             #Simulate and store trajectory
             u_sim_expert, x0_obs_dggr, xd_obs_dggr, n_simulated = mpc.sim_dagger(model, device)
@@ -549,10 +546,7 @@ if compare:
         mat_data['A'][:n_include,:n_include], mat_data['B'][:n_include,:n_include], mat_data['C'][:n_include,:n_include], mat_data['D'][:n_include,:n_include],
         SOFB_setp, beta_fgm, use_lqr=use_lqr)
     #Load nn model
-    if 'fc.weight' in nnparams.keys():
-        model = md.LinearController(n_state, n_ctrl)
-    else:
-        model = md.NNController(n_state, hidden_size, n_ctrl)
+    model = md.LinearController(n_state,n_ctrl)
     model.load_state_dict(nnparams)
     #Simulate using nn model
     y_sim_nn ,u_sim_nn, x0_obs_nn, xd_obs_nn = mpc.sim_nn(model, device)
