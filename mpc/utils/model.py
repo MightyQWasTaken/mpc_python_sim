@@ -15,14 +15,20 @@ class NNController(nn.Module):
         super(NNController, self).__init__()
         self.type = 'LinReLux4'
         # Initialize weights and biases for all layers
+
+        # Hidden layer 1
         self.fc1 = nn.Linear(n_state, hidden_size)
-
         self.act1 = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, int(hidden_size/2))
 
+        # Hideen layer 2
+        self.fc2 = nn.Linear(hidden_size, int(hidden_size/2))
         self.act2 = nn.ReLU()
+        
+        # Hidden layer 3
         # self.fc3 = nn.Linear(hidden_size, hidden_size)
         # self.act3 = nn.ReLU()
+
+        # Output layer
         self.fc4 = nn.Linear(int(hidden_size/2), n_ctrl)
 
 

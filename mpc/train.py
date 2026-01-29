@@ -47,18 +47,18 @@ u_test_data = torch.load(os.path.join(data_dir, 'u_test.pt'))
 
 #Settings
 
-# Model selection: 'linear' (simple linear), 'lqr' (LQR-based controller), or 'nn' (neural network)
+# Model selection: 'linear' (simple linear) or 'nn' (neural network)
 model_type = 'nn'
 LoadParams = False #If true will load the initial parameters from a saved model
 
 #Hyperparameters
-hidden_size = 64
-learning_rate = 5e-3
-num_epochs = 500
+hidden_size = 64    # Number of neurons for hidden layer 1. Note that number of neurons in hidden layer 2 is half of hidden_size
+learning_rate = 3e-5
+num_epochs = 5
 weight_decay = 0
-batch_size = 64
-num_layers = 1
-wandb_run_name = "NN input appended with linear cost and constraints. Frequency sweep. Frequency is 1/4 that of blue line in fig 22. New loss function; only L1 for now. Should be similar to blue in Figure 22"
+batch_size = 128
+num_layers = 2      # Note that this variable isn't used. Number of hidden layers is hard coded in model.py
+wandb_run_name = "Smaller # training data. n_include = 4. Lighterweight training. AWGN disturbance WITH frequency sweep. noise_std=4.0."
 
 
 # region | data prep

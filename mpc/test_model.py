@@ -27,6 +27,8 @@ import pandas as pd
 import time
 # endregion
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # region | helper functions to generate random disturbance modes
 
 #Helper function to generate random disturbance modes
@@ -62,6 +64,46 @@ def randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag, freq=1, amp_ratio=1):
     doff = base_doff * sinusoid[np.newaxis, :]
     return doff
 
+
+# Helper function to generate random disturbance modes with Additive White Gaussian Noise (AWGN)
+def randModesAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag, noise_std=4.0):
+    """
+    Generates a base disturbance mode and adds time-varying Gaussian noise (AWGN).
+    """
+    base_doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)  # shape (TOT_BPM, n_samples)
+
+    # Generate white Gaussian noise for the entire duration
+    # Since randModes sets the seed, this noise generation is also determined by 'seed'
+    noise = np.random.normal(loc=0.0, scale=noise_std, size=base_doff.shape)
+
+    # Mask to apply noise only on active BPMs
+    mask = np.zeros_like(base_doff)
+    mask[id_to_bpm, :] = 1.0
+
+    # Combine base disturbance with noise
+    doff = base_doff + (noise * mask)
+    return doff
+
+
+# Helper function to generate random sinusoidal disturbance modes with Additive White Gaussian Noise (AWGN)
+def randModesSinusoidAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag, freq=1, amp_ratio=1, noise_std=4.0):
+    """
+    Generates a base disturbance mode with sinusoidal modulation and adds time-varying Gaussian noise (AWGN).
+    """
+    base_doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag, freq, amp_ratio)
+
+    # Generate white Gaussian noise for the entire duration
+    # Since randModes sets the seed, this noise generation is also determined by 'seed'
+    noise = np.random.normal(loc=0.0, scale=noise_std, size=base_doff.shape)
+
+    # Mask to apply noise only on active BPMs
+    mask = np.zeros_like(base_doff)
+    mask[id_to_bpm, :] = 1.0
+
+    # Combine base disturbance with noise
+    doff = base_doff + (noise * mask)
+    return doff
+
 # endregion
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,9 +128,10 @@ use_dagger = False
 #Toggle for LQR limits - Note that this is incompatible with OSQP
 use_lqr = False
 #Define max number of samples
-n_samples = 15000
+n_samples = 8000
 #first n_include BPMs and CMs active for testing
 n_include = 4
+
 
 # endregion
 
@@ -288,7 +331,7 @@ if generate_data:
     
     
     #Initialise array of seeds for pertubations
-    n_traj = 50 
+    n_traj = 20 
     trainseeds = np.linspace(1, n_traj*n_include, n_traj*n_include).astype(int)
     u_mags = np.linspace(1, 100, n_traj*n_include)
     n_tests = n_traj * n_include
@@ -317,10 +360,18 @@ if generate_data:
 
     for seed, u_mag in zip(trainseeds, u_mags):
         print('[{}/{}]'.format(n_complete, n_tests))
-        #Generate random disturbance modes based on seed
+        # Generate random disturbance modes based on seed
         # doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)
-        # Use deterministic sinusoidal disturbance instead
-        doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+
+        # Generate sinusoid disturbance overlayed onto random disturbances based on seed
+        # doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+
+        # Generate AWGN disturbance overlayed onto random disturbances based on seed
+        # doff = randModesAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+
+        # Generate Sinusoid with AWGN disturbance
+        doff = randModesSinusoidAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+        
 
 
 
@@ -504,10 +555,19 @@ if generate_data:
 
 
 else:   # If not training simulate once for comparison or evaluation
+    comaprison_seed = 4200     # need to set a random seed for generating disturbances. This is used only here, to compare NN to MPC controller. It would be good if this seed is not one of the seeds used during training, which are defined by np.linspace(1, n_traj*n_include, n_traj*n_include).astype(int)
+    comparison_u_mag = 100
     # Generate constant non-zero disturbance for evaluation
-    # doff = randModes(4200, RM, id_to_bpm, TOT_BPM, 100)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
-    # Use deterministic sinusoidal disturbance instead
-    doff = randModesSinusoid(4200, RM, id_to_bpm, TOT_BPM, 100)
+    # doff = randModes(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
+
+    # Generate sinusoid disturbance overlayed onto random disturbances based on seed
+    # doff = randModesSinusoid(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
+
+    # Generate AWGN disturbance overlayed onto random disturbances based on seed
+    # doff = randModesAWGN(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
+    
+    # Generate Sinusoid with AWGN disturbance
+    doff = randModesSinusoidAWGN(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
 
 
     #Simulation
@@ -631,10 +691,16 @@ if not use_dagger:
         axs[1, 2].set_ylabel('Loss')
         axs[1, 2].set_title('Training Loss')
         
-    #Subplot 8: Validation Loss
+    #Subplot 8: Validation Loss (Only plot once model has settled)
     if compare:
-        #Only plot once model has settled
         axs[1, 3].plot(loss_data['epochs'][10:], loss_data['val_losses'][10:])
+        axs[1, 3].set_xlabel('Epoch')
+        axs[1, 3].set_ylabel('Loss')
+        axs[1, 3].set_title('Validation Loss')
+
+        #Subplot 8: Validation Loss (Plot all epochs (good if #epochs is small ie <10))
+    if compare:
+        axs[1, 3].plot(loss_data['epochs'], loss_data['val_losses'])
         axs[1, 3].set_xlabel('Epoch')
         axs[1, 3].set_ylabel('Loss')
         axs[1, 3].set_title('Validation Loss')
