@@ -691,14 +691,14 @@ if not use_dagger:
         axs[1, 2].set_ylabel('Loss')
         axs[1, 2].set_title('Training Loss')
         
-    #Subplot 8: Validation Loss (Only plot once model has settled)
-    if compare:
-        axs[1, 3].plot(loss_data['epochs'][10:], loss_data['val_losses'][10:])
-        axs[1, 3].set_xlabel('Epoch')
-        axs[1, 3].set_ylabel('Loss')
-        axs[1, 3].set_title('Validation Loss')
+    # #Subplot 8: Validation Loss (Only plot once model has settled)
+    # if compare:
+    #     axs[1, 3].plot(loss_data['epochs'][10:], loss_data['val_losses'][10:])
+    #     axs[1, 3].set_xlabel('Epoch')
+    #     axs[1, 3].set_ylabel('Loss')
+    #     axs[1, 3].set_title('Validation Loss')
 
-        #Subplot 8: Validation Loss (Plot all epochs (good if #epochs is small ie <10))
+    #Subplot 8: Validation Loss (Plot all epochs (good if #epochs is small ie <10))
     if compare:
         axs[1, 3].plot(loss_data['epochs'], loss_data['val_losses'])
         axs[1, 3].set_xlabel('Epoch')
