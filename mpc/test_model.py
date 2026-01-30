@@ -120,9 +120,9 @@ pick_direction = dirs[pick_dir]      # 'horizontal' or 'vertical'
 sim_IMC = False
 use_FGM = False
 #Simulates multiple modes of disturbance to get training data
-generate_data = False
+generate_data = True
 #Toggle for comparing nn performance and mpc performance
-compare = True
+compare = False
 #Toggle for using DAGGER
 use_dagger = False
 #Toggle for LQR limits - Note that this is incompatible with OSQP
@@ -331,7 +331,7 @@ if generate_data:
     
     
     #Initialise array of seeds for pertubations
-    n_traj = 20 
+    n_traj = 1000 
     trainseeds = np.linspace(1, n_traj*n_include, n_traj*n_include).astype(int)
     u_mags = np.linspace(1, 100, n_traj*n_include)
     n_tests = n_traj * n_include
@@ -361,7 +361,7 @@ if generate_data:
     for seed, u_mag in zip(trainseeds, u_mags):
         print('[{}/{}]'.format(n_complete, n_tests))
         # Generate random disturbance modes based on seed
-        # doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+        doff = randModes(seed, RM, id_to_bpm, TOT_BPM, u_mag)
 
         # Generate sinusoid disturbance overlayed onto random disturbances based on seed
         # doff = randModesSinusoid(seed, RM, id_to_bpm, TOT_BPM, u_mag)
@@ -370,7 +370,7 @@ if generate_data:
         # doff = randModesAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag)
 
         # Generate Sinusoid with AWGN disturbance
-        doff = randModesSinusoidAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag)
+        # doff = randModesSinusoidAWGN(seed, RM, id_to_bpm, TOT_BPM, u_mag)
         
 
 
@@ -558,7 +558,7 @@ else:   # If not training simulate once for comparison or evaluation
     comaprison_seed = 4200     # need to set a random seed for generating disturbances. This is used only here, to compare NN to MPC controller. It would be good if this seed is not one of the seeds used during training, which are defined by np.linspace(1, n_traj*n_include, n_traj*n_include).astype(int)
     comparison_u_mag = 100
     # Generate constant non-zero disturbance for evaluation
-    # doff = randModes(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
+    doff = randModes(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)  # This is not a true random disturbance, because we set the seed. Seed it set to 4200
 
     # Generate sinusoid disturbance overlayed onto random disturbances based on seed
     # doff = randModesSinusoid(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
@@ -567,7 +567,7 @@ else:   # If not training simulate once for comparison or evaluation
     # doff = randModesAWGN(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
     
     # Generate Sinusoid with AWGN disturbance
-    doff = randModesSinusoidAWGN(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
+    # doff = randModesSinusoidAWGN(comaprison_seed, RM, id_to_bpm, TOT_BPM, comparison_u_mag)
 
 
     #Simulation
