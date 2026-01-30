@@ -59,7 +59,7 @@ class get_loss(nn.Module):
     If `upper_const` and `lower_const` are not provided, the loss falls back
     to the simple L1 supervised tracking loss.
     """
-    def __init__(self, l1_weight: float = 1.0, l2_weight: float = 0.0, l3_weight: float = 0.0, l4_weight: float = 0.0):
+    def __init__(self, l1_weight: float = 7.195321838727955, l2_weight: float = 0.2572408104587175, l3_weight: float = 4.3786266798228315, l4_weight: float = 4.254541969117355):
         super(get_loss, self).__init__()
         self.l1_weight = float(l1_weight)
         self.l2_weight = float(l2_weight)
