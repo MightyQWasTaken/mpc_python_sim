@@ -21,6 +21,8 @@ import threading
 from utils import model as md
 import wandb
 from tqdm import tqdm
+import optuna
+from optuna.visualization import plot_parallel_coordinate
 # endregion
 
 
@@ -117,8 +119,6 @@ else:
 
 # region | loss function and model loading
 
-criterion = md.get_loss()       # get loss function from utils
-
 # Try to load J_mpc from the data directory if present. These
 # are optional — if missing the L2 term will be skipped inside the loss.
 J_mpc = None
@@ -142,19 +142,12 @@ if LoadParams:                  # loads model weight if requested
     model.load_state_dict(state_dict)
 
 model.to(device)                # moves model to CPU/ GPU
-# Loss and optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)       # Adam optimizer
 
-# store the loss values (loss tracking)
-loss_values = []
-train_losses =[]
-val_losses = []
-epochs = []
 # endregion
 
 # region | test function (evaluates model on the test set and returns average loss)
 # Function for testing the model
-def test_model(model, test_loader):
+def test_model(model, test_loader, criterion):
     with torch.no_grad():
         loss_value = []
         for x_test_data, u_test_data in test_loader:
@@ -165,62 +158,162 @@ def test_model(model, test_loader):
     return np.mean(loss_value)
 # endregion
 
+# region | Optuna Objective Function
+def objective(trial):
+    # Suggest hyperparameters
+    l1_weight = trial.suggest_float("l1_weight", 0.0, 10.0)
+    l2_weight = trial.suggest_float("l2_weight", 0.0, 1.0)
+    l3_weight = trial.suggest_float("l3_weight", 0.0, 10.0)
+    l4_weight = trial.suggest_float("l4_weight", 0.0, 10.0)
 
-# region | initalising wandb
+    # Initialize the model (re-init for each trial)
+    if model_type == 'linear':
+        model = md.LinearController(n_state, n_ctrl)
+    elif model_type == 'nn':
+        model = md.NNController(n_state, hidden_size, n_ctrl)
+    model.to(device)
+
+    # Criterion with suggested params
+    criterion = md.get_loss(l1_weight=l1_weight, l2_weight=l2_weight, l3_weight=l3_weight, l4_weight=l4_weight)
+    
+    # Optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+    # Initialize WandB for this trial
+    run = wandb.init(
+        entity="adam-gardner-univeristy-of-oxford",
+        project="4YP",
+        group="optuna_optimization",
+        job_type="optimization",
+        name=f"trial_{trial.number}",
+        config={
+            "l1_weight": l1_weight,
+            "l2_weight": l2_weight,
+            "l3_weight": l3_weight,
+            "l4_weight": l4_weight,
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "epochs": num_epochs
+        },
+        reinit=True
+    )
+
+    # Training loop for this trial
+    for epoch in range(num_epochs):
+        model.train()
+        for i, (x_batch, u_batch) in enumerate(train_loader):
+            x_batch = x_batch.to(device, non_blocking=pin_memory).float()
+            u_batch = u_batch.to(device, non_blocking=pin_memory).float()
+
+            optimizer.zero_grad()
+            predictions = model(x_batch)
+
+            nu = u_batch.size(1)
+            if x_batch.size(1) >= 3 * nu:
+                u_upper = x_batch[:, -nu:]
+                u_lower = x_batch[:, -2*nu:-nu]
+                q_batch = x_batch[:, -3*nu:-2*nu]
+            else:
+                u_upper = None
+                u_lower = None
+                q_batch = None
+
+            loss = criterion(predictions, u_batch, upper_const=u_upper, lower_const=u_lower, J=J_mpc, q_vec=q_batch)
+            loss.backward()
+            optimizer.step()
+
+        # Validation
+        model.eval()
+        val_loss = test_model(model, test_loader, criterion)
+        
+        # Report intermediate objective value
+        trial.report(val_loss, epoch)
+        
+        run.log({"loss": loss.item(), "val_loss": val_loss, "epoch": epoch})
+
+        # Pruning
+        if trial.should_prune():
+            run.finish(quiet=True)
+            raise optuna.exceptions.TrialPruned()
+
+    run.finish(quiet=True)
+    return val_loss
+# endregion
+
+# region | training loop setup (Optuna Study)
+start = time.time()
+
+study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner())
+study.optimize(objective, n_trials=10)
+
+print("Best trial:")
+trial = study.best_trial
+print(f"  Value: {trial.value}")
+print("  Params: ")
+for key, value in trial.params.items():
+    print(f"    {key}: {value}")
+
+# Parallel Coordinate Plot
+try:
+    fig = plot_parallel_coordinate(study)
+    fig.write_image("optuna_parallel_coordinate.png")
+    print("Saved parallel coordinate plot to optuna_parallel_coordinate.png")
+except Exception as e:
+    print(f"Could not save parallel coordinate plot: {e}")
+
+# Save study results to CSV
+df = study.trials_dataframe()
+df.to_csv("optuna_trials.csv", index=False)
+print("Saved Optuna trials data to optuna_trials.csv")
+
+# Retrain with best parameters
+print("\nRetraining with best parameters...")
+best_params = study.best_params
+criterion = md.get_loss(
+    l1_weight=best_params["l1_weight"],
+    l2_weight=best_params["l2_weight"],
+    l3_weight=best_params["l3_weight"],
+    l4_weight=best_params["l4_weight"]
+)
+
+# Re-initialize model and optimizer for final training
+if model_type == 'linear':
+    model = md.LinearController(n_state, n_ctrl)
+elif model_type == 'nn':
+    model = md.NNController(n_state, hidden_size, n_ctrl)
+model.to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+
+# Final WandB run
 run = wandb.init(
     entity="adam-gardner-univeristy-of-oxford",
     project="4YP",
-    name=wandb_run_name,
-    config={
-        "learning_rate": learning_rate,
-        "batch size": batch_size,
-        "epochs": num_epochs,
-    },
+    name="best_optuna_run",
+    config=best_params,
+    reinit=True
 )
-# endregion
 
-# region | training loop setup
-total_step = len(train_loader)
-start = time.time()
+loss_values = []
+train_losses = []
+val_losses = []
+epochs = []
 
-#Start thread to monitor user input for early exit
-keep_training = True
-exit_event = threading.Event()
-
-#Function to check for user input
-def check_user_input():
-    global keep_training
-    input("Press Enter to stop training here...\n")
-    keep_training = False
-    exit_event.set()
-
-
-input_thread = threading.Thread(target=check_user_input)
-input_thread.start()
-# endregion
-
-# region | training loop
 for epoch in range(num_epochs):  # episode size
-    if keep_training == False:  # allows user to stop training by pressing enter (via background thread)
-        break
     model.eval()
-    val_loss = test_model(model, test_loader)
+    val_loss = test_model(model, test_loader, criterion)
     val_losses.append(val_loss)
-    TimeRemaining = ((time.time()-start) / (epoch+1)) * (num_epochs - epoch)
+    
     model.train()
-    print("No. iterations: ", len(train_loader))
     for i, (x_batch, u_batch) in enumerate(tqdm(train_loader, desc=f'Epoch {epoch+1}')):
         # Move tensors to the configured device
-
-        # Move batch to device (non-blocking if pinned memory enabled) and cast
         x_batch = x_batch.to(device, non_blocking=pin_memory).float()
         u_batch = u_batch.to(device, non_blocking=pin_memory).float()
 
         optimizer.zero_grad()       # clears gradient from previous iteration
         # Forward pass
         predictions = model(x_batch)    # network computes predicted controls given the states
-        # Extract per-sample control constraints from the tail of x_batch and q_vector
-        # Assumes last 2*nu columns are [lower_constraints, upper_constraints]
+        
+        # Extract per-sample control constraints
         nu = u_batch.size(1)
         if x_batch.size(1) >= 3 * nu:
             u_upper = x_batch[:, -nu:]
@@ -245,17 +338,12 @@ for epoch in range(num_epochs):  # episode size
     epochs.append(epoch)
     train_losses.append(loss.item())
     print('Epoch [{}/{}], Loss: {:.4f}, Validation Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item(), val_loss))
-    
-# Signal the thread to exit if it hasn't already
-exit_event.set()
 
-# Wait for the input thread to finish
-input_thread.join()
 # endregion
 
 
 # region | final test and model saving
-print('Test Loss: {:.4f}'.format(test_model(model, test_loader)))
+print('Test Loss: {:.4f}'.format(test_model(model, test_loader, criterion)))
 
 # Use project-root data directory path (not relative path)
 model_dir = os.path.join(data_dir, 'model')

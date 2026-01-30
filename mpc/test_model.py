@@ -120,9 +120,9 @@ pick_direction = dirs[pick_dir]      # 'horizontal' or 'vertical'
 sim_IMC = False
 use_FGM = False
 #Simulates multiple modes of disturbance to get training data
-generate_data = False
+generate_data = True
 #Toggle for comparing nn performance and mpc performance
-compare = True
+compare = False
 #Toggle for using DAGGER
 use_dagger = False
 #Toggle for LQR limits - Note that this is incompatible with OSQP
@@ -691,14 +691,14 @@ if not use_dagger:
         axs[1, 2].set_ylabel('Loss')
         axs[1, 2].set_title('Training Loss')
         
-    #Subplot 8: Validation Loss (Only plot once model has settled)
-    if compare:
-        axs[1, 3].plot(loss_data['epochs'][10:], loss_data['val_losses'][10:])
-        axs[1, 3].set_xlabel('Epoch')
-        axs[1, 3].set_ylabel('Loss')
-        axs[1, 3].set_title('Validation Loss')
+    # #Subplot 8: Validation Loss (only showing >10 epochs)
+    # if compare:
+    #     axs[1, 3].plot(loss_data['epochs'][10:], loss_data['val_losses'][10:])
+    #     axs[1, 3].set_xlabel('Epoch')
+    #     axs[1, 3].set_ylabel('Loss')
+    #     axs[1, 3].set_title('Validation Loss')
 
-        #Subplot 8: Validation Loss (Plot all epochs (good if #epochs is small ie <10))
+    #Subplot 8: Validation Loss (Plot all epochs (good if #epochs is small ie <10))
     if compare:
         axs[1, 3].plot(loss_data['epochs'], loss_data['val_losses'])
         axs[1, 3].set_xlabel('Epoch')
